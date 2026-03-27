@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#1e40af">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e40af'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>📊</text></svg>">
+<title>Life Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--faint:#94a3b8;--light:#f1f5f9}
+.dark{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--faint:#64748b;--light:#1e293b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+textarea,input,select,button{font-family:inherit;font-size:11px;color:var(--text)}
+input,textarea,select{background:var(--card);border-color:var(--border)}
+.tabs{display:flex;gap:1px;overflow-x:auto;border-bottom:2px solid var(--border);padding-bottom:3px;margin-bottom:6px;-webkit-overflow-scrolling:touch}
+.tab{padding:5px 7px;border-radius:5px 5px 0 0;border:none;cursor:pointer;font-weight:400;background:transparent;color:var(--muted);font-size:9px;white-space:nowrap}.tab.on{font-weight:700;background:#3b82f6;color:#fff}
+.cd{background:var(--card);border-radius:7px;padding:8px;border:1px solid var(--border);margin-bottom:5px}
+.sc{border-radius:7px;padding:8px;margin-bottom:5px}
+.bt{border:none;border-radius:5px;padding:5px 10px;cursor:pointer;font-size:10px;font-weight:600;color:#fff;-webkit-tap-highlight-color:transparent}
+.ip{padding:4px 6px;border-radius:5px;border:1px solid var(--border);font-size:11px;width:100%;box-sizing:border-box;background:var(--card);color:var(--text)}
+.sl{padding:4px 6px;border-radius:5px;border:1px solid var(--border);font-size:11px;background:var(--card);color:var(--text)}
+.lb{font-size:9px;font-weight:600;color:var(--muted);display:block;margin-bottom:1px}
+h2{font-size:14px;margin-bottom:6px}h3{font-size:11px;margin-bottom:4px;font-weight:700}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.pill{display:inline-flex;align-items:center;gap:2px;padding:3px 8px;border-radius:14px;font-size:9px;font-weight:600}
+svg text{font-family:-apple-system,sans-serif}
+@media(max-width:480px){.tabs{gap:0}.tab{padding:4px 5px;font-size:8px}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useRef}=React;
+
+// === STORAGE ===
+const DB={
+g:k=>{try{return JSON.parse(localStorage.getItem("v9-"+k))}catch{return null}},
+s:(k,v)=>{try{localStorage.setItem("v9-"+k,JSON.stringify(v))}catch{}}
+};
+
+// === UTILS ===
+const dk=d=>d.toISOString().split("T")[0];
+const td=()=>dk(new Date());
+const fmt=d=>d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+const fmtL=d=>d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+const DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+// === CONSTANTS ===
+const COL={class:"#3b82f6",work:"#f59e0b",study:"#10b981",career:"#8b5cf6",skill:"#ec4899",exercise:"#06b6d4",meal:"#78716c",free:"#6b7280",routine:"#a3a3a3",commute:"#d4d4d4",chore:"#a78bfa",journal:"#f472b6",reading:"#f97316",skincare:"#14b8a6"};
+const LAB={class:"Class",work:"Work",study:"Study",career:"Career",skill:"Skills",exercise:"Exercise",meal:"Meal",free:"Free",routine:"Routine",commute:"Commute",chore:"Chores",journal:"Journal",reading:"Reading",skincare:"Skincare"};
+
+// === 4-WEEK MEAL ROTATION ===
+const MW=[
+{name:"Wk A: Asian",days:{1:{b:"Cereal",l:"@work",d:"Stir-Fry"},2:{b:"Eggs+Toast",l:"@work",d:"Egg Curry"},3:{b:"Cereal",l:"Egg Fried Rice",d:"Tofu Ramen"},4:{b:"Oatmeal",l:"@work",d:"Omelet"},5:{b:"Smoothie",l:"Quesadilla",d:"Pesto Pasta+Egg"},6:{b:"Eggs+Toast",l:"Chickpea Wrap",d:"Lentil Soup"},0:{b:"Oatmeal",l:"Garlic Pasta",d:"Leftover Soup"}},
+grocery:"Eggs(12), bread, bananas, oats, PB, honey, frozen stir-fry veg, frozen berries, soy sauce, garlic, ginger, rice(2lb), ramen(3pk), firm tofu, canned tomatoes(2), onions(3), curry powder, turmeric, spinach, mushrooms, cheese, tortillas, black beans, chickpeas, pesto jar, pasta(1lb), olive oil, yogurt, milk, salsa, lettuce"},
+{name:"Wk B: Mediterranean",days:{1:{b:"Cereal",l:"@work",d:"Shakshuka"},2:{b:"Eggs+Toast",l:"@work",d:"Greek Bowl"},3:{b:"Cereal",l:"Hummus Wrap",d:"Aglio e Olio+Egg"},4:{b:"Oatmeal",l:"@work",d:"Feta Omelet"},5:{b:"Smoothie",l:"Caprese",d:"Chickpea Stew"},6:{b:"Eggs+Toast",l:"Greek Salad",d:"Red Lentil Soup"},0:{b:"Oatmeal",l:"Stew",d:"Soup"}},
+grocery:"Eggs(12), bread, bananas, oats, PB, honey, frozen berries, canned tomatoes(3), onions(3), garlic, cumin, paprika, feta, spinach, bell peppers(2), cucumber, cherry tomatoes, hummus, pita, mozzarella, basil, pasta(1lb), olive oil, chickpeas(2), red lentils(1lb), veggie broth, yogurt, milk, lemon, tortillas"},
+{name:"Wk C: Mexican",days:{1:{b:"Cereal",l:"@work",d:"Enchiladas"},2:{b:"Eggs+Toast",l:"@work",d:"Nachos"},3:{b:"Cereal",l:"Fried Rice",d:"Burrito Bowl"},4:{b:"Oatmeal",l:"@work",d:"Omelet"},5:{b:"Smoothie",l:"Quesadilla",d:"Mac+Cheese"},6:{b:"Eggs+Toast",l:"Chickpea Wrap",d:"Bean Soup"},0:{b:"Oatmeal",l:"Soup",d:"Enchiladas"}},
+grocery:"Eggs(12), bread, bananas, oats, PB, honey, frozen berries, tortillas(2pk), black beans(3), canned tomatoes(2), enchilada sauce, cheese(2bags), salsa, rice(2lb), avocados(3), corn(frozen), sour cream, onions(3), garlic, cumin, chili powder, macaroni, broccoli(frozen), chickpeas, mayo, mustard, lettuce, olive oil, yogurt, milk"},
+{name:"Wk D: Indian+Hearty",days:{1:{b:"Cereal",l:"@work",d:"Egg Curry"},2:{b:"Eggs+Toast",l:"@work",d:"Chana Masala"},3:{b:"Cereal",l:"Veggie Wrap",d:"Dal+Rice"},4:{b:"Oatmeal",l:"@work",d:"Potato Scramble"},5:{b:"Smoothie",l:"Quesadilla",d:"Pesto Pasta"},6:{b:"Eggs+Toast",l:"Hummus+Veg",d:"Minestrone"},0:{b:"Oatmeal",l:"Garlic Pasta",d:"Leftover"}},
+grocery:"Eggs(12), bread, bananas, oats, PB, honey, frozen berries, rice(2lb), canned tomatoes(3), chickpeas(2), yellow lentils(1lb), onions(4), garlic(2heads), ginger, curry powder, turmeric, garam masala, cumin, potatoes(3), carrots(3), celery, zucchini, white beans, pasta(1lb), pesto, tortillas, cheese, hummus, cucumber, bell pepper, olive oil, yogurt, milk, veggie broth"}
+];
+const getMW=()=>{const s=new Date("2026-03-23");return((Math.floor((new Date()-s)/(7*864e5))%4)+4)%4};
+
+// === DETAILED RECIPES ===
+const REC=[
+{nm:"Stir-Fry",t:"12m",eq:"Large pan/wok",ig:["1 bag frozen stir-fry veg (12oz)","2 tbsp soy sauce","1 garlic clove minced","½ tsp ginger","1 tbsp oil","1½ cups cooked rice"],st:["Heat pan HIGH. Oil 30sec until shimmery.","Frozen veg in. Stir every 30sec, 5 min until browned.","MEDIUM. Garlic+ginger 30sec (don't burn).","Soy sauce, stir 1 min. Serve on rice."],tip:"Add garlic AFTER veg — early=burns."},
+{nm:"Egg Curry",t:"15m",eq:"2 pots",ig:["3 eggs","1 can diced tomatoes","1 onion diced","2 garlic minced","1 tsp curry powder","½ tsp turmeric","1 tbsp oil","Rice"],st:["Boil eggs 10min. Cold water.","Oil MEDIUM. Onion 3min until soft.","Garlic 30sec. Curry+turmeric 30sec.","Add tomatoes. LOW simmer 8min.","Peel+halve eggs. Nestle in sauce. Serve on rice."],tip:"Pre-boil 6 eggs Sunday. Last 5 days."},
+{nm:"Egg Fried Rice",t:"10m",eq:"Large pan",ig:["1½ cups COLD rice (leftover!)","2 eggs","1 tbsp soy sauce","½ cup frozen peas/corn","1 tbsp oil"],st:["Oil HIGH. Frozen veg 1 min.","Push aside. Crack eggs, scramble 1 min.","Add COLD rice. Break clumps.","Soy sauce. Fry 3 min, press rice for crispy bits."],tip:"Secret: COLD rice. Cook night before. Warm=mush."},
+{nm:"Tofu Ramen",t:"10m",eq:"Pot+pan",ig:["1 ramen pack (HALF seasoning)","½ block firm tofu cubed, patted DRY","1 egg","Spinach handful","1 tbsp soy sauce"],st:["Cook ramen, half seasoning.","Oil MED-HIGH. Tofu single layer, DON'T MOVE 2min. Flip.","1min before done: crack egg+spinach into ramen pot.","Bowl. Top with tofu+soy."],tip:"Pat tofu VERY dry or it won't crisp."},
+{nm:"Shakshuka",t:"15m",eq:"Pan with lid",ig:["1 can diced tomatoes","2 eggs","½ onion diced","1 garlic","½ tsp cumin+paprika","Oil","Bread"],st:["Oil MEDIUM. Onion 3min.","Garlic+cumin+paprika 30sec.","Tomatoes. Simmer 5min.","2 wells. Crack egg each. Cover 5-6min.","Eat from pan with bread."],tip:"Don't stir after eggs. Wells hold them."},
+{nm:"Omelet",t:"10m",eq:"Non-stick pan",ig:["3 eggs","Spinach","Mushrooms sliced","¼ onion diced","Cheese","1 tbsp butter","Toast"],st:["Butter MEDIUM. Mushroom+onion 3min.","Spinach 1min. Push aside.","Beat eggs+salt. Pour in. DON'T TOUCH 2-3min.","Cheese on half. Fold. Serve with toast."],tip:"Non-stick essential. Eggs stick=more butter."},
+{nm:"Pesto Pasta+Egg",t:"12m",eq:"Pot+pan",ig:["2oz pasta","2 tbsp pesto jar","Sundried tomatoes chopped","1 egg","Parmesan"],st:["Boil SALTED water. Cook pasta. Drain.","Oil MEDIUM. Crack egg. 3min until crispy edges, runny yolk.","Toss pasta+pesto+tomatoes.","Plate. Egg on top. Parmesan."],tip:"Salt pasta water like the sea. #1 flavor tip."},
+{nm:"Lentil Soup",t:"20m",eq:"Large pot",ig:["1 cup red lentils RINSED","1 onion+2 garlic+1 carrot diced","4 cups veggie broth","1 tsp cumin","½ tsp turmeric","1 tbsp oil"],st:["Oil MEDIUM. Onion+garlic+carrot 3min.","Cumin+turmeric 30sec.","Lentils+broth. HIGH until boil.","LOW simmer 15min until soft. Salt+pepper.","Makes 3 servings. Lasts 3-4 days."],tip:"MUST rinse lentils or foam. No soaking needed."},
+{nm:"Burrito Bowl",t:"10m",eq:"Microwave",ig:["1 cup rice","½ can beans","¼ avocado","Salsa","Cheese","Corn"],st:["Microwave beans 1min.","Layer: rice→beans→corn→salsa→cheese→avocado."],tip:"Assembly, not cooking. Can't mess up."},
+{nm:"Chana Masala",t:"15m",eq:"Pot",ig:["1 can chickpeas drained","1 can tomatoes","½ onion","2 garlic","1 tsp garam masala","Ginger","Rice"],st:["Oil MEDIUM. Onion 3min.","Garlic+ginger 30sec. Spices 30sec.","Tomatoes+chickpeas. Simmer 10min. Serve on rice."],tip:"One Indian spice to own: garam masala."},
+{nm:"Garlic Pasta",t:"12m",eq:"Pot+pan",ig:["2oz pasta","3 garlic SLICED thin","3 tbsp olive oil","Red pepper flakes","Parmesan"],st:["Boil pasta. SAVE ½ cup water before drain.","Pan MED-LOW. Oil+garlic SLOWLY 2-3min until GOLDEN not brown.","Add pasta+2-3 tbsp saved water. Toss.","Parmesan."],tip:"LOW heat for garlic. Brown=bitter=start over."},
+{nm:"Mac+Cheese+Broccoli",t:"15m",eq:"Pot",ig:["1 cup macaroni","1 cup frozen broccoli","1 cup cheddar","⅓ cup milk","1 tbsp butter"],st:["Boil pasta. 3min before done, add broccoli to SAME pot.","Drain. Return to pot, heat OFF.","Butter+milk+cheese. Stir 1-2min until sauce."],tip:"Broccoli in pasta water saves a dish. Perfect timing."}
+];
+
+// === SCHEDULES (dinner 8-8:30) ===
+const SCH={
+1:[{t:"7:00-7:15",n:"AM skincare",c:"skincare"},{t:"7:15-7:25",n:"Breakfast",c:"meal"},{t:"7:25-7:45",n:"Commute BU",c:"commute"},{t:"8:00-10:45",n:"BA875",c:"class"},{t:"10:45-11:05",n:"Commute work",c:"commute"},{t:"11:05-11:30",n:"Review notes",c:"study"},{t:"11:30-4:30",n:"Work",c:"work"},{t:"4:30-4:55",n:"Commute home",c:"commute"},{t:"5:00-5:20",n:"Decompress",c:"free"},{t:"5:20-7:00",n:"Study: BA875",c:"study"},{t:"7:00-8:00",n:"Study: BA870",c:"study"},{t:"8:00-8:30",n:"Dinner",c:"meal"},{t:"8:30-9:30",n:"Career: 2 apps",c:"career"},{t:"9:30-10:30",n:"Free",c:"free"},{t:"10:30-10:45",n:"PM skincare",c:"skincare"},{t:"10:45-11:15",n:"Reading",c:"reading"},{t:"11:15-11:50",n:"Journal",c:"journal"}],
+2:[{t:"7:00-7:15",n:"AM skincare",c:"skincare"},{t:"7:15-7:35",n:"Breakfast",c:"meal"},{t:"7:35-9:15",n:"Study: BA875",c:"study"},{t:"9:15-9:30",n:"Break",c:"free"},{t:"9:30-10:05",n:"Commute work",c:"commute"},{t:"10:05-10:30",n:"Flashcards",c:"study"},{t:"10:30-3:30",n:"Work",c:"work"},{t:"3:30-3:55",n:"Commute home",c:"commute"},{t:"4:00-4:20",n:"Decompress",c:"free"},{t:"4:20-6:00",n:"Study: BA870",c:"study"},{t:"6:00-7:30",n:"Career: portfolio",c:"career"},{t:"7:30-8:00",n:"Skills: SQL/BI",c:"skill"},{t:"8:00-8:30",n:"Dinner",c:"meal"},{t:"8:30-10:00",n:"Skills cont.",c:"skill"},{t:"10:00-10:15",n:"PM skincare",c:"skincare"},{t:"10:15-10:45",n:"Reading",c:"reading"},{t:"10:45-11:30",n:"Journal",c:"journal"}],
+3:[{t:"7:00-7:15",n:"AM skincare",c:"skincare"},{t:"7:15-7:25",n:"Breakfast",c:"meal"},{t:"7:25-7:45",n:"Commute BU",c:"commute"},{t:"8:00-10:45",n:"BA875",c:"class"},{t:"10:45-11:00",n:"Commute home",c:"commute"},{t:"11:00-11:30",n:"Lunch",c:"meal"},{t:"11:30-1:20",n:"Study: BA875",c:"study"},{t:"1:20-1:35",n:"Break",c:"free"},{t:"1:35-3:00",n:"Study: BA870",c:"study"},{t:"3:00-3:45",n:"Exercise",c:"exercise"},{t:"3:45-4:15",n:"Shower",c:"routine"},{t:"4:15-5:45",n:"Career: 2 apps",c:"career"},{t:"5:45-7:30",n:"Skills: SQL/BI",c:"skill"},{t:"7:30-8:00",n:"Study",c:"study"},{t:"8:00-8:30",n:"Dinner",c:"meal"},{t:"8:30-10:15",n:"Free",c:"free"},{t:"10:15-10:30",n:"PM skincare",c:"skincare"},{t:"10:30-11:00",n:"Reading",c:"reading"},{t:"11:00-11:50",n:"Journal",c:"journal"}],
+4:[{t:"7:00-7:15",n:"AM skincare",c:"skincare"},{t:"7:15-7:35",n:"Breakfast",c:"meal"},{t:"7:35-9:00",n:"Study: BA870",c:"study"},{t:"9:00-9:15",n:"Break",c:"free"},{t:"9:15-10:30",n:"Study: BA875",c:"study"},{t:"10:30-11:05",n:"Commute work",c:"commute"},{t:"11:05-11:30",n:"Snack",c:"meal"},{t:"11:30-4:30",n:"Work",c:"work"},{t:"4:30-4:55",n:"Commute home",c:"commute"},{t:"5:00-5:20",n:"Decompress",c:"free"},{t:"5:20-7:00",n:"Study: priority",c:"study"},{t:"7:00-8:00",n:"Career: apps",c:"career"},{t:"8:00-8:30",n:"Dinner",c:"meal"},{t:"8:30-9:30",n:"Skills: SQL/BI",c:"skill"},{t:"9:30-10:30",n:"Free",c:"free"},{t:"10:30-10:45",n:"PM skincare",c:"skincare"},{t:"10:45-11:15",n:"Reading",c:"reading"},{t:"11:15-11:50",n:"Journal",c:"journal"}],
+5:[{t:"7:00-7:15",n:"AM skincare",c:"skincare"},{t:"7:15-7:35",n:"Breakfast",c:"meal"},{t:"7:35-9:30",n:"Study: BA870",c:"study"},{t:"9:30-9:45",n:"Break",c:"free"},{t:"9:45-11:15",n:"Career+Skills",c:"career"},{t:"11:15-11:45",n:"Commute BU",c:"commute"},{t:"12:00-2:45",n:"BA870",c:"class"},{t:"2:45-3:00",n:"Commute home",c:"commute"},{t:"3:00-3:30",n:"Lunch",c:"meal"},{t:"3:30-5:00",n:"Study: BA870",c:"study"},{t:"5:00-5:45",n:"Exercise: HIIT",c:"exercise"},{t:"5:45-6:15",n:"Shower",c:"routine"},{t:"6:15-8:00",n:"Study: BA875",c:"study"},{t:"8:00-8:30",n:"Dinner",c:"meal"},{t:"8:30-10:00",n:"Free",c:"free"},{t:"10:00-10:15",n:"PM skincare",c:"skincare"},{t:"10:15-10:45",n:"Reading",c:"reading"},{t:"10:45-11:30",n:"Journal",c:"journal"}],
+6:[{t:"7:00-7:15",n:"AM skincare",c:"skincare"},{t:"7:15-7:35",n:"Breakfast",c:"meal"},{t:"7:35-9:30",n:"Study: BA875",c:"study"},{t:"9:30-9:45",n:"Break",c:"free"},{t:"9:45-11:30",n:"Study: BA870",c:"study"},{t:"11:30-12:15",n:"Exercise",c:"exercise"},{t:"12:15-12:45",n:"Shower",c:"routine"},{t:"12:45-1:15",n:"Lunch",c:"meal"},{t:"1:15-2:45",n:"Skills: SQL/BI",c:"skill"},{t:"2:45-3:00",n:"Break",c:"free"},{t:"3:00-4:30",n:"Career: 3+ apps",c:"career"},{t:"4:30-6:00",n:"Skills 2",c:"skill"},{t:"6:00-6:30",n:"Study: preview",c:"study"},{t:"6:30-8:00",n:"Grocery (1.5hr)",c:"chore"},{t:"8:00-8:45",n:"Dinner (batch)",c:"meal"},{t:"8:45-10:00",n:"Free",c:"free"},{t:"10:00-10:15",n:"PM skincare",c:"skincare"},{t:"10:15-10:45",n:"Reading",c:"reading"},{t:"10:45-11:30",n:"Journal",c:"journal"}],
+0:[{t:"7:00-7:15",n:"AM skincare",c:"skincare"},{t:"7:15-7:35",n:"Breakfast",c:"meal"},{t:"7:35-8:00",n:"Weekly planning",c:"journal"},{t:"8:00-10:00",n:"Study: both",c:"study"},{t:"10:00-10:15",n:"Break",c:"free"},{t:"10:15-12:00",n:"Skills",c:"skill"},{t:"12:00-12:30",n:"Lunch",c:"meal"},{t:"12:30-1:00",n:"Start laundry",c:"chore"},{t:"1:00-2:30",n:"Study during wash",c:"study"},{t:"2:30-2:45",n:"Switch laundry",c:"chore"},{t:"2:45-4:15",n:"Career: apps",c:"career"},{t:"4:15-4:45",n:"Fold",c:"chore"},{t:"4:45-5:30",n:"Exercise",c:"exercise"},{t:"5:30-6:00",n:"Shower",c:"routine"},{t:"6:00-8:00",n:"Study: hardest",c:"study"},{t:"8:00-8:30",n:"Dinner",c:"meal"},{t:"8:30-9:30",n:"Free",c:"free"},{t:"9:30-9:45",n:"PM skincare",c:"skincare"},{t:"9:45-10:15",n:"Reading",c:"reading"},{t:"10:15-11:15",n:"Journal",c:"journal"}]
+};
+
+// === KEY DATES ===
+const DATES=[{d:"2026-03-25",n:"BA875 HW1"},{d:"2026-03-30",n:"BA875 HW2"},{d:"2026-04-01",n:"BA875 Midterm"},{d:"2026-04-10",n:"BA870 Test#2"},{d:"2026-04-13",n:"BA875 HW3"},{d:"2026-04-15",n:"BA875 HW4"},{d:"2026-04-17",n:"BA870 Pres"},{d:"2026-04-22",n:"BA875 HW5"},{d:"2026-04-24",n:"BA870 Final Pres"},{d:"2026-04-29",n:"BA875 Final"},{d:"2026-05-01",n:"START ECBA"},{d:"2026-07-15",n:"ECBA Exam"},{d:"2026-07-20",n:"START CAPM"},{d:"2026-09-30",n:"CAPM Exam"},{d:"2027-01-17",n:"EMPLOYED!"}];
+
+// === SKILLS ===
+const SKD={sql:["SELECT/WHERE","AND/OR/IN","ORDER BY/LIMIT","Aggregates","GROUP BY/HAVING","INNER JOIN","LEFT/RIGHT JOIN","FULL+self","Subqueries","CTEs","ROW_NUMBER/RANK","LAG/LEAD","CASE WHEN","String funcs","Date funcs","INSERT/UPDATE/DEL","CREATE/ALTER","Complex queries","SQLBolt done","HackerRank done"],powerbi:["Install","Connect data","Power Query","Data model","Basic DAX","Cols vs measures","CALCULATE","Time intel","Core visuals","Maps","Slicers","Cond format","Bookmarks","RLS","Publish","Dashboard#1","Dashboard#2","Dashboard#3"],python:["Variables","Strings","Lists/dicts","Loops","Functions","File I/O","Imports","pandas read","pandas filter","pandas groupby","pandas merge","pandas pivot","matplotlib","seaborn","Jupyter","Clean dataset"]};
+
+// === INTERVIEW QUESTIONS ===
+const IQ=[{c:"Behavioral",q:["Tell me about yourself","Difficult stakeholder?","Project you led?","Time you failed?","Learned quickly?","Prioritize deadlines?","Data-driven decision?"]},{c:"BA/DA Technical",q:["Requirements approach?","Conflicting requirements?","Dataset walkthrough?","LEFT vs INNER JOIN?","Data quality?","Executive dashboard?","SQL experience?"]},{c:"PM Technical",q:["Feature prioritization?","Product roadmap?","Launch success?","Sprint planning?","Scope creep?","Agile vs Waterfall?","Incomplete data?"]},{c:"Case Study",q:["Sales dropped 20%?","Design pipeline?","Improve UX?","Messy data deadline?","Market size?"]}];
+
+const PF=["Resume updated","Cover letter tailored","Portfolio working","LinkedIn matches","Company research","Questions ready","References ready","Proofread"];
+const RES=[{c:"Professors",i:["BA875 Bellamy bellamym@bu.edu Wed1:30-3","BA870 Wysocki wysockip@bu.edu"]},{c:"Learning",i:["sqlbolt.com","hackerrank.com/domains/sql","learn.microsoft.com (PowerBI)","py4e.com"]},{c:"Certs",i:["ECBA iiba.org","CAPM pmi.org","PL-300 learn.microsoft.com","Data+ comptia.org"]},{c:"Career",i:["BU Career questromworld.bu.edu/careers","Handshake","Glassdoor"]}];
+const JQUICK=["Studied BA875","Studied BA870","Applied to jobs","Exercised","Skill building","LinkedIn post","Read 30min","Cooked","Office hours"];
+
+// === FOCUS BY WEEK ===
+function getSF(d){const k=dk(d);
+if(k<"2026-03-25")return{a:"Forecasting Ch.2-3. HW1 due 3/25!",b:"Technical Analysis. Streamlit.",s:"SQL: sqlbolt.com lessons 1-12. Power BI: Install Desktop + microsoft.com/learn module 1."};
+if(k<"2026-04-01")return{a:"MIDTERM PREP Ch.1-3. Exam 4/1.",b:"Textual Analysis NLP.",s:"SQL: SQLBolt 13-18. hackerrank.com easy. Power BI: modules 2-3."};
+if(k<"2026-04-10")return{a:"Unconstraining+Capacity. HW3 4/13.",b:"TEST #2 PREP! Test 4/10!",s:"SQL: HackerRank medium. Subqueries+CTEs. Power BI: DAX basics."};
+if(k<"2026-04-17")return{a:"Pricing Ch.6. HW4.",b:"Team project. Pres 4/17.",s:"SQL: Window functions. Power BI: CALCULATE. Start dashboard #1."};
+if(k<"2026-04-30")return{a:"FINAL PREP. Exam 4/29.",b:"Presentations 4/24.",s:"SQL: Complex queries. Power BI: dashboards. Python: pandas py4e.com."};
+return{a:"Semester done.",b:"ECBA prep.",s:"Cert materials. Continue SQL/BI."};}
+
+// === SMART JOURNAL FEEDBACK ===
+function getSmartFB(jT,journals,habits){
+const fb=[];const a=(jT.accomplished||"").toLowerCase(),r=(jT.roadblocks||"").toLowerCase(),t=(jT.tomorrow||"").toLowerCase();
+const rc=[];for(let i=1;i<=3;i++){const d2=new Date();d2.setDate(d2.getDate()-i);const k=dk(d2);if(journals[k])rc.push(journals[k])}
+const rr=rc.map(j=>(j.roadblocks||"").toLowerCase()).join(" ");
+const dc=(rr.match(/distract|phone|screen|scroll/g)||[]).length;
+if(!jT.accomplished||jT.accomplished.trim().length<10)fb.push({t:"w",m:"Log 3+ accomplishments."});
+if(/distract|phone|screen|scroll/.test(r))fb.push({t:"a",m:dc>=2?"🔴 PATTERN: Screens 3+ days. DELETE social apps this week.":"Phone → another room during study."});
+if(/tired|sleep|fatigue/.test(r))fb.push({t:"a",m:"Fatigue → midnight bedtime. All 3 meals."});
+if(/motivat|lazy|procrastinat/.test(r))fb.push({t:"a",m:"Low motivation → 2-min rule. Start Pomodoro."});
+if(/confus|stuck|hard/.test(r))fb.push({t:"a",m:"Knowledge wall → office hours this week."});
+const hab=habits[td()]||{};
+if(hab.exercise&&!/exercise/.test(a))fb.push({t:"g",m:"Exercise logged in habits ✓"});
+const next=DATES.find(x=>x.d>=td());
+if(next){const dy=Math.ceil((new Date(next.d+"T23:59:59")-new Date())/(864e5));if(dy<=2)fb.push({t:"a",m:`⚠️ ${next.n} ${dy===0?"TODAY":dy===1?"TOMORROW":"in 2d"}`})}
+const jKeys=Object.keys(journals).sort().reverse();
+const lastLI=jKeys.find(k=>/linkedin|post/.test((journals[k].accomplished||"").toLowerCase()));
+const daysSinceLI=lastLI?Math.floor((new Date()-new Date(lastLI+"T12:00:00"))/(864e5)):99;
+if(daysSinceLI>=14)fb.push({t:"a",m:"📱 "+daysSinceLI+"+ days since LinkedIn post. Time for a Project Showcase or Industry Insight!"});
+if(/job|apply|resume|linkedin/.test(a))fb.push({t:"g",m:"Career work done."});
+if(/sql|python|power bi/.test(a))fb.push({t:"g",m:"Skill building ✓"});
+if(!/study|homework|assignment|class/.test(a))fb.push({t:"w",m:"No academic work logged."});
+if(!t||t.length<10)fb.push({t:"w",m:"Set #1 for tomorrow."});
+if(!fb.length)fb.push({t:"g",m:"Solid day."});return fb;}
+
+// === CHART ===
+function MiniChart({data,color,label,h=55,w=260}){
+if(!data||!data.length)return null;const max=Math.max(...data.map(d=>d.v),1);
+const pts=data.map((d,i)=>[i*(w-40)/(Math.max(data.length-1,1))+20,h-8-(d.v/max)*(h-22)]);
+return<svg viewBox={`0 0 ${w} ${h+10}`} style={{width:"100%",maxWidth:w}}>
+<text x={w/2} y={9} textAnchor="middle" fontSize="8" fill="var(--muted)" fontWeight="600">{label}</text>
+<polyline points={pts.map(p=>p.join(",")).join(" ")} fill="none" stroke={color} strokeWidth="1.5"/>
+{pts.map((p,i)=><g key={i}><circle cx={p[0]} cy={p[1]} r="2.5" fill={color}/><text x={p[0]} y={p[1]-5} textAnchor="middle" fontSize="6" fill="var(--text)">{data[i].v}</text><text x={p[0]} y={h+7} textAnchor="middle" fontSize="5" fill="var(--faint)">{data[i].l}</text></g>)}</svg>}
+
+// ============ MAIN APP ============
+function App(){
+const[dark,setDark]=useState(()=>DB.g("dark")||false);
+const[tab,setTab]=useState("home");
+const[date,setDate]=useState(new Date());
+const[edits,setEdits]=useState(()=>DB.g("edits")||{});
+const[journals,setJournals]=useState(()=>DB.g("journals")||{});
+const[editIdx,setEditIdx]=useState(null);
+const[editVal,setEditVal]=useState({t:"",n:"",c:"study"});
+const[jT,setJT]=useState({accomplished:"",roadblocks:"",tomorrow:""});
+const[jS,setJS]=useState(false);
+const[oR,setOR]=useState(null);
+const[grades,setGrades]=useState(()=>DB.g("grades")||{ba875:{hw:[],mid:null,final:null,part:null},ba870:{tests:[],proj:null,part:null}});
+const[gForm,setGForm]=useState({course:"ba875",cat:"hw",name:"",score:"",max:"100"});
+const[apps,setApps]=useState(()=>DB.g("apps")||[]);
+const[appForm,setAppForm]=useState({company:"",role:"",status:"applied",notes:""});
+const[nets,setNets]=useState(()=>DB.g("nets")||[]);
+const[netForm,setNetForm]=useState({name:"",company:"",status:"sent"});
+const[skills,setSkills]=useState(()=>DB.g("skills")||{sql:Array(20).fill(false),powerbi:Array(18).fill(false),python:Array(16).fill(false)});
+const[habits,setHabits]=useState(()=>DB.g("habits")||{});
+const[habT,setHabT]=useState({reading:false,exercise:false,skincare:false,journal:false,cooking:false,water:0,sleep:"",wake:"",mood:0,screen:""});
+const[budget,setBudget]=useState(()=>DB.g("budget")||[]);
+const[bForm,setBForm]=useState({type:"expense",category:"",amount:""});
+const[pomo,setPomo]=useState({on:false,work:true,sec:1500});
+const pomoRef=useRef(null);
+const[studyT,setStudyT]=useState({on:false,sec:0,subj:""});
+const studyRef=useRef(null);
+const[studyLog,setStudyLog]=useState(()=>DB.g("slog")||[]);
+const[notes,setNotes]=useState(()=>DB.g("notes")||[]);
+const[noteText,setNoteText]=useState("");
+const[intAns,setIntAns]=useState(()=>DB.g("intans")||{});
+const[whyText,setWhyText]=useState(()=>DB.g("why")||"I'm building the version of myself that gets hired by January 2027.");
+const[pf,setPf]=useState(()=>DB.g("pf")||Array(8).fill(false));
+const[wkG,setWkG]=useState(()=>DB.g("wkg")||{g1:"",g2:"",g3:"",d1:false,d2:false,d3:false});
+const[certHrs,setCertHrs]=useState(()=>DB.g("certhrs")||{ecba:0,capm:0});
+
+useEffect(()=>{document.body.className=dark?"dark":""},[dark]);
+
+const d=dk(date),dow=date.getDay(),mw=getMW(),wm=MW[mw];
+const rawSch=edits[d]||SCH[dow]||[];
+const sch=rawSch.map(b=>{if(b.c!=="meal")return b;const m=wm.days[dow];
+if(/Breakfast/i.test(b.n)||/7:1/.test(b.t))return{...b,n:"🌅 "+m.b};
+if(/Lunch/i.test(b.n))return{...b,n:"🍽️ "+m.l};
+if(/Dinner/i.test(b.n)||/8:0/.test(b.t))return{...b,n:"🌙 "+m.d};return b});
+const isToday=td()===d;
+
+// JOURNAL FIX: Load existing, allow appending
+useEffect(()=>{
+  const existing=journals[d];
+  if(existing){setJT(existing);setJS(true)}
+  else{setJT({accomplished:"",roadblocks:"",tomorrow:""});setJS(false)}
+},[d]);
+
+const sE=ne=>{setEdits(ne);DB.s("edits",ne)};
+const sJ=nj=>{setJournals(nj);DB.s("journals",nj)};
+const nav=dir=>{const nd=new Date(date);nd.setDate(nd.getDate()+dir);setDate(nd);setEditIdx(null)};
+
+const ws=new Date(date);ws.setDate(ws.getDate()-ws.getDay());
+const wd=Array.from({length:7},(_,i)=>{const x=new Date(ws);x.setDate(x.getDate()+i);return x});
+const up=DATES.filter(k=>k.d>=td()).slice(0,3);
+const cd=(()=>{const n=DATES.find(x=>x.d>=td());if(!n)return null;return{...n,days:Math.ceil((new Date(n.d+"T23:59:59")-new Date())/(864e5))}})();
+const fb=jS?getSmartFB(jT,journals,habits):[];
+
+const saveHab=(k,v)=>{const t2=td();const u={...habT,[k]:v};setHabT(u);const nh={...habits,[t2]:u};setHabits(nh);DB.s("habits",nh)};
+const getStreak=key=>{let s=0,d2=new Date();for(let i=0;i<365;i++){const k=dk(d2);if(habits[k]&&habits[k][key])s++;else if(i>0)break;d2.setDate(d2.getDate()-1)}return s};
+
+// Pomodoro
+useEffect(()=>{if(pomo.on){pomoRef.current=setInterval(()=>{setPomo(p=>{if(p.sec<=1){clearInterval(pomoRef.current);try{const a=new AudioContext(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=800;g.gain.value=.3;o.start();setTimeout(()=>o.stop(),500)}catch{}return{on:false,work:!p.work,sec:p.work?300:1500}}return{...p,sec:p.sec-1}})},1000)}else if(pomoRef.current)clearInterval(pomoRef.current);return()=>{if(pomoRef.current)clearInterval(pomoRef.current)}},[pomo.on]);
+
+// Study timer
+useEffect(()=>{if(studyT.on){studyRef.current=setInterval(()=>setStudyT(p=>({...p,sec:p.sec+1})),1000)}else if(studyRef.current)clearInterval(studyRef.current);return()=>{if(studyRef.current)clearInterval(studyRef.current)}},[studyT.on]);
+
+const todayStudy=studyLog.filter(l=>l.date===td()).reduce((s,l)=>s+l.min,0);
+
+// Weighted grades
+const calcW=c=>{const g=grades[c];
+if(c==="ba875"){const ha=g.hw?.length?g.hw.reduce((s,x)=>s+x.score/x.max,0)/g.hw.length*100:null;const mi=g.mid?g.mid.score/g.mid.max*100:null;const fi=g.final?g.final.score/g.final.max*100:null;const pa=g.part?g.part.score/g.part.max*100:null;let t=0,w=0;if(ha!==null){t+=ha*40;w+=40}if(mi!==null){t+=mi*25;w+=25}if(fi!==null){t+=fi*25;w+=25}if(pa!==null){t+=pa*10;w+=10}return w?(t/w).toFixed(1):null}
+else{const te=g.tests?.length?g.tests.reduce((s,x)=>s+x.score/x.max,0)/g.tests.length*100:null;const pr=g.proj?g.proj.score/g.proj.max*100:null;const pa=g.part?g.part.score/g.part.max*100:null;let t=0,w=0;if(te!==null){t+=te*60;w+=60}if(pr!==null){t+=pr*25;w+=25}if(pa!==null){t+=pa*15;w+=15}return w?(t/w).toFixed(1):null}};
+
+// Trends
+const screenData=(()=>{const r=[];for(let i=6;i>=0;i--){const d2=new Date();d2.setDate(d2.getDate()-i);const k=dk(d2);const h=habits[k];r.push({l:DN[d2.getDay()],v:h?.screen?Number(h.screen):0})}return r})();
+const studyData=(()=>{const r=[];for(let i=6;i>=0;i--){const d2=new Date();d2.setDate(d2.getDate()-i);const k=dk(d2);r.push({l:DN[d2.getDay()],v:studyLog.filter(l=>l.date===k).reduce((s,l)=>s+l.min,0)})}return r})();
+const tmrw=new Date();tmrw.setDate(tmrw.getDate()+1);const tmrwSch=(SCH[tmrw.getDay()]||[]).slice(0,4);
+const nudges=nets.filter(n=>n.status==="sent"&&n.date).filter(n=>Math.floor((new Date()-new Date(n.date))/(864e5))>=5);
+
+// .ics
+const exportICS=()=>{const lines=["BEGIN:VCALENDAR","VERSION:2.0"];sch.forEach(b=>{const ps=b.t.split("-");if(ps.length<2)return;const[sh,sm]=(ps[0]).split(":").map(Number),[eh,em]=(ps[1]).split(":").map(Number);const ds=new Date(date);ds.setHours(sh,sm,0);const de=new Date(date);de.setHours(eh,em,0);const f=x=>x.toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");lines.push("BEGIN:VEVENT","DTSTART:"+f(ds),"DTEND:"+f(de),"SUMMARY:"+b.n,"END:VEVENT")});lines.push("END:VCALENDAR");const blob=new Blob([lines.join("\r\n")],{type:"text/calendar"});const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download="sched-"+d+".ics";a.click()};
+
+// Export/Import
+const exportAll=()=>{const data={edits,journals,grades,apps,nets,skills,habits,budget,notes,intAns,whyText,pf,wkG,studyLog,certHrs,dark};const b=new Blob([JSON.stringify(data)],{type:"application/json"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="backup-"+td()+".json";a.click()};
+const importAll=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);
+const map={edits:[setEdits,"edits"],journals:[setJournals,"journals"],grades:[setGrades,"grades"],apps:[setApps,"apps"],nets:[setNets,"nets"],skills:[setSkills,"skills"],habits:[setHabits,"habits"],budget:[setBudget,"budget"],notes:[setNotes,"notes"],intAns:[setIntAns,"intans"],studyLog:[setStudyLog,"slog"],certHrs:[setCertHrs,"certhrs"]};
+Object.entries(map).forEach(([k,[fn,sk]])=>{if(d[k]){fn(d[k]);DB.s(sk,d[k])}});
+if(d.whyText){setWhyText(d.whyText);DB.s("why",d.whyText)}
+if(d.wkG){setWkG(d.wkG);DB.s("wkg",d.wkG)}
+if(d.pf){setPf(d.pf);DB.s("pf",d.pf)}
+if(d.dark!==undefined){setDark(d.dark);DB.s("dark",d.dark)}
+alert("Imported!")}catch{alert("Invalid file")}};r.readAsText(f)};
+
+// JOURNAL SAVE — appends to existing entry for the day
+const saveJournal=()=>{
+  const existing=journals[d];
+  let updated=jT;
+  // If there's already a saved entry AND the user has added new content, append
+  if(existing&&jS){
+    // The textarea already contains the full content (loaded on day change)
+    // so we just save whatever is in the fields
+    updated=jT;
+  }
+  sJ({...journals,[d]:updated});
+  setJS(true);
+};
+
+const TL=[["home","🏠"],["sched","📅"],["focus","🎯"],["grades","📊"],["career","💼"],["skills","🔧"],["habits","🔥"],["meals","🍽"],["charts","📈"],["pomo","⏱"],["budget","💰"],["notes","📝"],["res","📚"],["certs","📜"],["log","📓"],["set","⚙"]];
+
+return <div style={{maxWidth:700,margin:"0 auto",padding:"4px 8px",paddingBottom:40}}>
+<div style={{background:"linear-gradient(135deg,#1e40af,#7c3aed)",color:"#fff",borderRadius:8,padding:"6px 12px",marginBottom:6,textAlign:"center",fontSize:10,fontWeight:600}}>{whyText}</div>
+<div className="tabs">{TL.map(([k,e])=><button key={k} className={`tab${tab===k?" on":""}`} onClick={()=>setTab(k)}>{e}</button>)}</div>
+
+{/* HOME */}
+{tab==="home"&&<div>
+{cd&&<div className="sc" style={{background:"#fef3c7",border:"1px solid #fde68a",textAlign:"center"}}><b style={{color:"#92400e",fontSize:10}}>⏳ {cd.n} — {cd.days===0?"TODAY":cd.days+"d"}</b></div>}
+<div className="cd"><h3>Weekly Goals</h3>{["g1","g2","g3"].map((gk,i)=><div key={i} style={{display:"flex",gap:5,alignItems:"center",marginBottom:3}}><div onClick={()=>{const u={...wkG,["d"+(i+1)]:!wkG["d"+(i+1)]};setWkG(u);DB.s("wkg",u)}} style={{width:16,height:16,borderRadius:4,border:"2px solid "+(wkG["d"+(i+1)]?"#10b981":"var(--border)"),background:wkG["d"+(i+1)]?"#10b981":"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,flexShrink:0}}>{wkG["d"+(i+1)]&&"✓"}</div><input className="ip" placeholder={`Goal ${i+1}`} value={wkG[gk]} onChange={e=>{const u={...wkG,[gk]:e.target.value};setWkG(u);DB.s("wkg",u)}}/></div>)}</div>
+<div className="g2">{[["BA875",calcW("ba875")],["BA870",calcW("ba870")],["Apps",apps.length+""],["Study",todayStudy+"m"]].map(([l,v],i)=><div key={i} className="cd" style={{textAlign:"center",padding:5}}><div style={{fontSize:9,color:"var(--muted)"}}>{l}</div><div style={{fontSize:17,fontWeight:700,color:i<2?(v&&parseFloat(v)>=90?"#16a34a":"#f59e0b"):"#3b82f6"}}>{v||"—"}</div></div>)}</div>
+<div style={{display:"flex",gap:3,flexWrap:"wrap",marginBottom:6}}>{[["reading","📖","#f97316"],["exercise","💪","#06b6d4"],["skincare","✨","#14b8a6"],["journal","📓","#f472b6"]].map(([k,e,c])=><div key={k} className="pill" style={{background:c+"15",color:c}}>{e} {getStreak(k)}d</div>)}</div>
+<div className="cd"><MiniChart data={screenData} color="#ef4444" label="Screen Time (min) — 7 Days"/></div>
+<div className="cd"><h3>Tomorrow Preview</h3>{tmrwSch.map((b,i)=><div key={i} style={{fontSize:10,padding:"2px 0"}}><span style={{color:"var(--faint)"}}>{b.t}</span> {b.n}</div>)}</div>
+{nudges.length>0&&<div className="sc" style={{background:"#fef2f2",border:"1px solid #fecaca"}}><b style={{fontSize:10,color:"#991b1b"}}>📬 Follow up:</b>{nudges.map((n,i)=><div key={i} style={{fontSize:10,color:"#991b1b"}}>{n.name} — no reply 5+d</div>)}</div>}
+<div className="cd"><h3>Mood</h3><div style={{display:"flex",gap:8,justifyContent:"center"}}>{["😫","😕","😐","🙂","😄"].map((e,i)=><div key={i} onClick={()=>saveHab("mood",i+1)} style={{fontSize:22,cursor:"pointer",opacity:habT.mood===i+1?1:.25}}>{e}</div>)}</div></div>
+</div>}
+
+{/* SCHEDULE */}
+{tab==="sched"&&<div>
+<div style={{textAlign:"center",marginBottom:5}}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:3}}>
+<button onClick={()=>nav(-1)} style={{border:"none",background:"var(--light)",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:16,color:"var(--text)"}}>←</button>
+<div style={{fontSize:13,fontWeight:700}}>{fmtL(date)}</div>
+<button onClick={()=>nav(1)} style={{border:"none",background:"var(--light)",borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:16,color:"var(--text)"}}>→</button></div>
+{!isToday&&<button className="bt" style={{background:"#3b82f6",fontSize:9}} onClick={()=>{setDate(new Date());setEditIdx(null)}}>Today</button>}
+<div style={{display:"flex",justifyContent:"center",gap:3,marginTop:3}}>{wd.map((x,i)=><div key={i} onClick={()=>{setDate(x);setEditIdx(null)}} style={{cursor:"pointer",textAlign:"center",padding:"3px 5px",borderRadius:5,background:dk(x)===d?"#3b82f6":"var(--light)",color:dk(x)===d?"#fff":"var(--text)",border:td()===dk(x)?"2px solid #3b82f6":"1px solid var(--border)",fontSize:9,minWidth:28}}><div style={{fontWeight:600}}>{DN[i]}</div><div>{x.getDate()}</div></div>)}</div></div>
+<button className="bt" style={{background:"#10b981",fontSize:9,marginBottom:4}} onClick={exportICS}>📅 Export .ics</button>
+
+{sch.map((b,i)=><div key={i} onClick={()=>editIdx===i?null:((setEditIdx(i)),setEditVal({...(rawSch[i]||b)}))} style={{display:"flex",borderRadius:6,overflow:"hidden",cursor:"pointer",border:editIdx===i?"2px solid #3b82f6":"1px solid var(--border)",background:"var(--card)",marginBottom:2}}>
+<div style={{width:4,background:COL[b.c]}}/>
+<div style={{flex:1,padding:"4px 7px"}}>
+{editIdx===i?<div style={{display:"flex",flexDirection:"column",gap:3}} onClick={e=>e.stopPropagation()}>
+<div style={{display:"flex",gap:3}}><input className="ip" value={editVal.t} onChange={e=>setEditVal({...editVal,t:e.target.value})} style={{flex:"0 0 85px",width:"auto"}}/><select className="sl" value={editVal.c} onChange={e=>setEditVal({...editVal,c:e.target.value})}>{Object.entries(LAB).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
+<input className="ip" value={editVal.n} onChange={e=>setEditVal({...editVal,n:e.target.value})}/>
+<div style={{display:"flex",gap:3}}><button className="bt" style={{background:"#10b981"}} onClick={()=>{const ns=[...rawSch];ns[editIdx]={...editVal};sE({...edits,[d]:ns});setEditIdx(null)}}>Save</button><button className="bt" style={{background:"var(--muted)"}} onClick={()=>setEditIdx(null)}>Cancel</button><button className="bt" style={{background:"#ef4444",marginLeft:"auto"}} onClick={()=>{sE({...edits,[d]:rawSch.filter((_,j)=>j!==i)});setEditIdx(null)}}>Del</button></div>
+</div>:<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:8,color:"var(--faint)",fontWeight:600}}>{b.t}</div><div style={{fontSize:10,fontWeight:500}}>{b.n}</div></div><div style={{fontSize:7,color:COL[b.c],fontWeight:700,textTransform:"uppercase"}}>{LAB[b.c]}</div></div>}
+</div></div>)}
+<div style={{display:"flex",gap:3,marginTop:3}}><button className="bt" style={{background:"#3b82f6"}} onClick={()=>{const ns=[...rawSch,{t:"0:00-0:00",n:"New",c:"free"}];sE({...edits,[d]:ns});setEditIdx(ns.length-1);setEditVal({t:"0:00-0:00",n:"New",c:"free"})}}>+ Add</button>{edits[d]&&<button className="bt" style={{background:"#ef4444"}} onClick={()=>{const ne={...edits};delete ne[d];sE(ne);setEditIdx(null)}}>Reset</button>}</div>
+
+{/* Study timer */}
+<div className="cd" style={{marginTop:6}}><h3>Study Timer</h3>
+<div style={{display:"flex",gap:5,alignItems:"center"}}><span style={{fontSize:20,fontWeight:700,color:"#10b981",fontVariantNumeric:"tabular-nums"}}>{Math.floor(studyT.sec/60)}:{(studyT.sec%60<10?"0":"")+(studyT.sec%60)}</span>
+{!studyT.on?<><input className="ip" placeholder="Subject" value={studyT.subj} onChange={e=>setStudyT({...studyT,subj:e.target.value})} style={{width:90}}/><button className="bt" style={{background:"#10b981"}} onClick={()=>setStudyT({...studyT,on:true,sec:0})}>Start</button></>
+:<button className="bt" style={{background:"#ef4444"}} onClick={()=>{setStudyT({...studyT,on:false});if(studyT.sec>=60){const e={subj:studyT.subj||"Gen",min:Math.round(studyT.sec/60),date:td()};const nl=[e,...studyLog];setStudyLog(nl);DB.s("slog",nl)}}}>Stop & Log</button>}
+</div>
+{todayStudy>0&&<div style={{fontSize:10,color:"var(--muted)",marginTop:3}}>Today: {todayStudy}m logged</div>}
+</div>
+
+{/* Journal with quick buttons and append fix */}
+<div className="cd" style={{marginTop:6}}><h3>Journal — {fmt(date)}</h3>
+<div style={{display:"flex",flexWrap:"wrap",gap:2,marginBottom:4}}>{JQUICK.map(q=><button key={q} className="bt" style={{background:"var(--light)",color:"var(--text)",fontSize:8,fontWeight:400}} onClick={()=>{setJT(p=>({...p,accomplished:(p.accomplished?p.accomplished+", ":"")+q}));setJS(false)}}>{q}</button>)}</div>
+{["accomplished","roadblocks","tomorrow"].map(k=><div key={k} style={{marginBottom:4}}><label className="lb">{{accomplished:"What did you accomplish?",roadblocks:"Roadblocks?",tomorrow:"#1 priority tomorrow?"}[k]}</label><textarea className="ip" value={jT[k]} onChange={e=>{setJT({...jT,[k]:e.target.value});setJS(false)}} rows={2} style={{resize:"vertical"}}/></div>)}
+<button className="bt" style={{background:"#8b5cf6"}} onClick={saveJournal}>{jS?"✓ Saved — edit anytime":"Save Journal"}</button>
+{jS&&fb.length>0&&<div style={{marginTop:6,borderTop:"1px solid var(--border)",paddingTop:5}}><div style={{fontSize:10,fontWeight:700,marginBottom:3}}>Feedback</div>{fb.map((f,i)=><div key={i} style={{padding:"4px 6px",borderRadius:5,marginBottom:3,fontSize:10,lineHeight:1.4,background:f.t==="g"?"#f0fdf4":f.t==="w"?"#fefce8":"#eff6ff",color:f.t==="g"?"#166534":f.t==="w"?"#92400e":"#1e40af"}}>{f.t==="g"?"✓ ":f.t==="w"?"⚠ ":"→ "}{f.m}</div>)}</div>}
+</div></div>}
+
+{/* FOCUS */}
+{tab==="focus"&&<div><h2>Focus — {DN[dow]}</h2>
+{(()=>{const sf=getSF(date);return<>
+<div className="sc" style={{background:"#eff6ff",border:"1px solid #bfdbfe"}}><h3 style={{color:"#1e40af"}}>BA875</h3><div style={{fontSize:11,lineHeight:1.5}}>{sf.a}</div></div>
+<div className="sc" style={{background:"#f0fdf4",border:"1px solid #bbf7d0"}}><h3 style={{color:"#166534"}}>BA870</h3><div style={{fontSize:11,lineHeight:1.5}}>{sf.b}</div></div>
+<div className="sc" style={{background:"#fdf4ff",border:"1px solid #e9d5ff"}}><h3 style={{color:"#7c3aed"}}>Skills — Where to Learn</h3><div style={{fontSize:11,lineHeight:1.6}}>{sf.s}</div></div>
+</>})()}</div>}
+
+{/* GRADES */}
+{tab==="grades"&&<div><h2>Grades (Weighted)</h2>
+{["ba875","ba870"].map(c=>{const g=grades[c],avg=calcW(c);return<div key={c} className="cd">
+<div style={{display:"flex",justifyContent:"space-between"}}><h3>{c.toUpperCase()}</h3>{avg&&<span style={{fontSize:11,fontWeight:700,color:parseFloat(avg)>=90?"#16a34a":"#f59e0b"}}>{avg}%</span>}</div>
+<div style={{fontSize:9,color:"var(--muted)",marginBottom:4}}>{c==="ba875"?"HW 40% | Mid 25% | Final 25% | Part 10%":"Tests 60% | Project 25% | Part 15%"}</div>
+{c==="ba875"&&(g.hw||[]).map((x,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:10,padding:"2px 0"}}><span>HW: {x.name}</span><span>{x.score}/{x.max} <button style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:8}} onClick={()=>{const ng={...grades,ba875:{...g,hw:g.hw.filter((_,j)=>j!==i)}};setGrades(ng);DB.s("grades",ng)}}>✕</button></span></div>)}
+{c==="ba870"&&(g.tests||[]).map((x,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:10,padding:"2px 0"}}><span>Test: {x.name}</span><span>{x.score}/{x.max} <button style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:8}} onClick={()=>{const ng={...grades,ba870:{...g,tests:g.tests.filter((_,j)=>j!==i)}};setGrades(ng);DB.s("grades",ng)}}>✕</button></span></div>)}
+{g.mid&&<div style={{fontSize:10}}>Midterm: {g.mid.score}/{g.mid.max}</div>}
+{g.final&&<div style={{fontSize:10}}>Final: {g.final.score}/{g.final.max}</div>}
+{g.proj&&<div style={{fontSize:10}}>Project: {g.proj.score}/{g.proj.max}</div>}
+{g.part&&<div style={{fontSize:10}}>Participation: {g.part.score}/{g.part.max}</div>}
+{avg&&<div style={{background:"#eff6ff",borderRadius:5,padding:6,marginTop:4,fontSize:10,color:"#1e40af"}}>Need ~<b>{Math.max(0,Math.ceil((93-parseFloat(avg))*2+parseFloat(avg===calcW(c)?50:0)))}</b>% on remaining work for A</div>}
+</div>})}
+<div className="cd"><h3>Add Grade</h3>
+<div style={{display:"flex",gap:3,flexWrap:"wrap"}}><select className="sl" value={gForm.course} onChange={e=>setGForm({...gForm,course:e.target.value})}><option value="ba875">BA875</option><option value="ba870">BA870</option></select>
+<select className="sl" value={gForm.cat} onChange={e=>setGForm({...gForm,cat:e.target.value})}>
+{gForm.course==="ba875"?["hw","mid","final","part"].map(c=><option key={c} value={c}>{{hw:"Homework",mid:"Midterm",final:"Final",part:"Participation"}[c]}</option>)
+:["tests","proj","part"].map(c=><option key={c} value={c}>{{tests:"Test",proj:"Project",part:"Participation"}[c]}</option>)}
+</select>
+{(gForm.cat==="hw"||gForm.cat==="tests")&&<input className="ip" placeholder="Name" value={gForm.name} onChange={e=>setGForm({...gForm,name:e.target.value})} style={{flex:"1 1 60px"}}/>}
+<input className="ip" type="number" placeholder="Score" value={gForm.score} onChange={e=>setGForm({...gForm,score:e.target.value})} style={{width:50}}/>
+<input className="ip" type="number" placeholder="Max" value={gForm.max} onChange={e=>setGForm({...gForm,max:e.target.value})} style={{width:50}}/>
+<button className="bt" style={{background:"#3b82f6"}} onClick={()=>{if(gForm.score){const ng={...grades};const c=gForm.course;const entry={name:gForm.name||gForm.cat,score:+gForm.score,max:+gForm.max};
+if(gForm.cat==="hw")ng[c]={...ng[c],hw:[...(ng[c].hw||[]),entry]};
+else if(gForm.cat==="tests")ng[c]={...ng[c],tests:[...(ng[c].tests||[]),entry]};
+else ng[c]={...ng[c],[gForm.cat]:entry};
+setGrades(ng);DB.s("grades",ng);setGForm({...gForm,name:"",score:"",max:"100"})}}}>Add</button></div></div></div>}
+
+{/* CAREER — FULL */}
+{tab==="career"&&<div><h2>Career Hub</h2>
+<div style={{display:"flex",gap:3,marginBottom:5,flexWrap:"wrap"}}>{["applied","screen","interview","offer","rejected"].map(s=><div key={s} style={{background:"var(--light)",border:"1px solid var(--border)",borderRadius:5,padding:"3px 8px",textAlign:"center",fontSize:9}}><div style={{fontWeight:700,color:s==="offer"?"#16a34a":s==="rejected"?"#dc2626":"#3b82f6"}}>{apps.filter(a=>a.status===s).length}</div><div style={{color:"var(--muted)"}}>{s}</div></div>)}</div>
+<div className="cd"><h3>Add Application</h3>
+<div style={{display:"flex",gap:3,flexWrap:"wrap",marginBottom:3}}><input className="ip" placeholder="Company" value={appForm.company} onChange={e=>setAppForm({...appForm,company:e.target.value})} style={{flex:"1 1 100px"}}/><input className="ip" placeholder="Role" value={appForm.role} onChange={e=>setAppForm({...appForm,role:e.target.value})} style={{flex:"1 1 100px"}}/><select className="sl" value={appForm.status} onChange={e=>setAppForm({...appForm,status:e.target.value})}>{["applied","screen","interview","offer","rejected"].map(s=><option key={s}>{s}</option>)}</select></div>
+<input className="ip" placeholder="Notes (referral, contact name...)" value={appForm.notes} onChange={e=>setAppForm({...appForm,notes:e.target.value})} style={{marginBottom:3}}/>
+<button className="bt" style={{background:"#3b82f6"}} onClick={()=>{if(appForm.company){const na=[{...appForm,id:Date.now(),date:td()},...apps];setApps(na);DB.s("apps",na);setAppForm({company:"",role:"",status:"applied",notes:""});setPf(Array(8).fill(false));DB.s("pf",Array(8).fill(false))}}}>Add Application</button></div>
+
+{apps.map((a,i)=><div key={a.id||i} className="cd" style={{padding:6}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><b style={{fontSize:11}}>{a.company}</b>{a.role&&<span style={{fontSize:10,color:"var(--muted)"}}> — {a.role}</span>}</div>
+<div style={{display:"flex",gap:3,alignItems:"center"}}><select className="sl" value={a.status} onChange={e=>{const na=[...apps];na[i]={...a,status:e.target.value};setApps(na);DB.s("apps",na)}} style={{fontSize:9}}>{["applied","screen","interview","offer","rejected"].map(s=><option key={s}>{s}</option>)}</select><button style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer"}} onClick={()=>{const na=apps.filter((_,j)=>j!==i);setApps(na);DB.s("apps",na)}}>✕</button></div></div>
+{a.notes&&<div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>{a.notes}</div>}
+{a.date&&<div style={{fontSize:8,color:"var(--faint)"}}>{a.date}</div>}
+</div>)}
+
+{/* Pre-flight */}
+<div className="cd" style={{marginTop:8}}><h3>Pre-Application Checklist</h3>
+<div style={{fontSize:9,color:"var(--muted)",marginBottom:3}}>Auto-resets when you add a new application</div>
+{PF.map((item,i)=><div key={i} onClick={()=>{const np=[...pf];np[i]=!np[i];setPf(np);DB.s("pf",np)}} style={{display:"flex",gap:6,padding:"3px 0",cursor:"pointer"}}><div style={{width:15,height:15,borderRadius:4,border:"2px solid "+(pf[i]?"#10b981":"var(--border)"),background:pf[i]?"#10b981":"transparent",color:"#fff",fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{pf[i]&&"✓"}</div><span style={{fontSize:10,color:pf[i]?"var(--faint)":"var(--text)"}}>{item}</span></div>)}</div>
+
+{/* Networking */}
+<div className="cd" style={{marginTop:8}}><h3>Networking Log</h3>
+<div style={{display:"flex",gap:3,marginBottom:3}}><input className="ip" placeholder="Name" value={netForm.name} onChange={e=>setNetForm({...netForm,name:e.target.value})} style={{flex:1}}/><input className="ip" placeholder="Company" value={netForm.company} onChange={e=>setNetForm({...netForm,company:e.target.value})} style={{flex:1}}/><button className="bt" style={{background:"#8b5cf6"}} onClick={()=>{if(netForm.name){const nn=[{...netForm,id:Date.now(),date:td()},...nets];setNets(nn);DB.s("nets",nn);setNetForm({name:"",company:"",status:"sent"})}}}>Add</button></div>
+{nets.map((n,i)=>{const daysSince=n.date?Math.floor((new Date()-new Date(n.date))/(864e5)):0;
+return<div key={n.id||i} style={{display:"flex",justifyContent:"space-between",fontSize:10,padding:"4px 0",borderBottom:"1px solid var(--light)"}}>
+<div><b>{n.name}</b>{n.company&&" @ "+n.company} <span style={{fontSize:8,color:daysSince>=5?"#dc2626":"var(--faint)"}}>{daysSince}d{daysSince>=5?" ⚠️":""}</span></div>
+<div style={{display:"flex",gap:3}}><select className="sl" value={n.status} onChange={e=>{const nn=[...nets];nn[i]={...n,status:e.target.value};setNets(nn);DB.s("nets",nn)}} style={{fontSize:9}}>{["sent","responded","meeting","done"].map(s=><option key={s}>{s}</option>)}</select><button style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer"}} onClick={()=>{const nn=nets.filter((_,j)=>j!==i);setNets(nn);DB.s("nets",nn)}}>✕</button></div></div>})}
+</div>
+
+{/* Interview Prep */}
+<div className="cd" style={{marginTop:8}}><h3>Interview Prep Bank</h3>
+<div style={{fontSize:9,color:"var(--muted)",marginBottom:4}}>Draft answers — saved automatically and included in backups</div>
+{IQ.map((cat,ci)=><div key={ci} style={{marginBottom:8}}>
+<div style={{fontSize:11,fontWeight:700,color:"#1e40af",marginBottom:3}}>{cat.c}</div>
+{cat.q.map((q,qi)=>{const key=ci+"-"+qi;return<div key={qi} style={{marginBottom:4}}>
+<div style={{fontSize:10,fontWeight:600}}>{q}</div>
+<textarea className="ip" placeholder="Draft your answer..." value={intAns[key]||""} onChange={e=>{const na={...intAns,[key]:e.target.value};setIntAns(na);DB.s("intans",na)}} rows={2} style={{resize:"vertical",marginTop:2}}/></div>})}</div>)}</div>
+</div>}
+
+{/* SKILLS */}
+{tab==="skills"&&<div><h2>Skills</h2>
+{[["sql","SQL","#3b82f6"],["powerbi","Power BI","#ec4899"],["python","Python","#10b981"]].map(([k,nm,cl])=>{const dn=skills[k].filter(Boolean).length,tt=SKD[k].length;return<div key={k} className="cd">
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><h3 style={{margin:0,color:cl}}>{nm}</h3><span style={{fontSize:10,fontWeight:700,color:cl}}>{dn}/{tt}</span></div>
+<div style={{height:5,background:"var(--light)",borderRadius:3,marginBottom:5,overflow:"hidden"}}><div style={{height:"100%",background:cl,width:(dn/tt*100)+"%",transition:"width .3s"}}/></div>
+{SKD[k].map((t,i)=><div key={i} onClick={()=>{const ns={...skills,[k]:[...skills[k]]};ns[k][i]=!ns[k][i];setSkills(ns);DB.s("skills",ns)}} style={{display:"flex",gap:5,padding:"3px 0",cursor:"pointer"}}><div style={{width:14,height:14,borderRadius:4,border:"2px solid "+(skills[k][i]?cl:"var(--border)"),background:skills[k][i]?cl:"transparent",color:"#fff",fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{skills[k][i]&&"✓"}</div><span style={{fontSize:10,textDecoration:skills[k][i]?"line-through":"none",color:skills[k][i]?"var(--faint)":"var(--text)"}}>{t}</span></div>)}</div>})}</div>}
+
+{/* HABITS */}
+{tab==="habits"&&<div><h2>Habits</h2>
+<div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>{[["reading","📖","#f97316"],["exercise","💪","#06b6d4"],["skincare","✨","#14b8a6"],["journal","📓","#f472b6"],["cooking","🍳","#78716c"]].map(([k,e,c])=><div key={k} className="pill" style={{background:c+"15",color:c}}>{e} {getStreak(k)}d</div>)}</div>
+<div className="cd"><h3>Today's Habits</h3>{[["reading","Reading 30 min"],["exercise","Exercise"],["skincare","Skincare AM+PM"],["journal","Journaled"],["cooking","Cooked a meal"]].map(([k,l])=><div key={k} onClick={()=>saveHab(k,!habT[k])} style={{display:"flex",gap:6,padding:"4px 0",cursor:"pointer"}}><div style={{width:16,height:16,borderRadius:4,border:"2px solid "+(habT[k]?"#10b981":"var(--border)"),background:habT[k]?"#10b981":"transparent",color:"#fff",fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{habT[k]&&"✓"}</div><span style={{fontSize:11}}>{l}</span></div>)}</div>
+<div className="cd"><h3>💧 Water</h3><div style={{display:"flex",gap:3,alignItems:"center"}}>{Array.from({length:8}).map((_,i)=><div key={i} onClick={()=>saveHab("water",i+1)} style={{width:22,height:28,borderRadius:4,cursor:"pointer",background:i<habT.water?"#3b82f6":"var(--light)",fontSize:8,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,color:i<habT.water?"#fff":"var(--faint)"}}>{i+1}</div>)}<span style={{fontSize:11,fontWeight:600,color:"#3b82f6",marginLeft:4}}>{habT.water}/8</span></div></div>
+<div className="cd"><h3>😴 Sleep</h3><div style={{display:"flex",gap:8,alignItems:"center"}}><div><label className="lb">Bedtime</label><input className="ip" type="time" value={habT.sleep} onChange={e=>saveHab("sleep",e.target.value)} style={{width:100}}/></div><div><label className="lb">Wake</label><input className="ip" type="time" value={habT.wake} onChange={e=>saveHab("wake",e.target.value)} style={{width:100}}/></div>{habT.sleep&&habT.wake&&<span style={{fontSize:11,fontWeight:600,color:"#8b5cf6",alignSelf:"flex-end"}}>{(()=>{let m=(habT.wake.split(":").map(Number).reduce((a,b)=>a*60+b)-habT.sleep.split(":").map(Number).reduce((a,b)=>a*60+b));if(m<0)m+=1440;return(m/60).toFixed(1)+"h"})()}</span>}</div></div>
+<div className="cd"><h3>📱 Screen Time</h3><div style={{display:"flex",gap:5,alignItems:"center"}}><input className="ip" type="number" placeholder="Total minutes today" value={habT.screen} onChange={e=>saveHab("screen",e.target.value)} style={{width:120}}/>{habT.screen&&<span style={{fontSize:10,fontWeight:600,color:Number(habT.screen)>120?"#dc2626":"#16a34a"}}>{Number(habT.screen)>120?"⚠ Over 2hrs":"✓ Under control"}</span>}</div></div>
+<div className="cd"><h3>Mood</h3><div style={{display:"flex",gap:8,justifyContent:"center"}}>{["😫","😕","😐","🙂","😄"].map((e,i)=><div key={i} onClick={()=>saveHab("mood",i+1)} style={{fontSize:24,cursor:"pointer",opacity:habT.mood===i+1?1:.25}}>{e}</div>)}</div></div>
+</div>}
+
+{/* MEALS */}
+{tab==="meals"&&<div><h2>{wm.name}</h2>
+<div className="cd"><h3>This Week's Plan</h3>{Object.entries(wm.days).map(([dw,m])=><div key={dw} style={{fontSize:10,padding:"3px 0",borderBottom:"1px solid var(--light)"}}><b>{DN[dw]}</b> 🌅{m.b} · 🍽️{m.l} · 🌙{m.d}</div>)}</div>
+<div className="sc" style={{background:"#f0fdf4",border:"1px solid #bbf7d0"}}><h3 style={{color:"#166534"}}>🛒 Grocery List (shop Saturday)</h3><div style={{fontSize:10,color:"#14532d",lineHeight:1.6}}>{wm.grocery}</div></div>
+<h3>Recipes (tap to expand)</h3>
+{REC.map((r,i)=><div key={i} className="cd" style={{padding:0}}><div onClick={()=>setOR(oR===i?null:i)} style={{padding:"6px 8px",cursor:"pointer",display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:600,fontSize:11}}>{r.nm} <span style={{fontWeight:400,color:"var(--muted)"}}>{r.t}</span></span><span style={{color:"var(--faint)"}}>{oR===i?"▲":"▼"}</span></div>
+{oR===i&&<div style={{padding:"0 8px 8px",borderTop:"1px solid var(--light)"}}>
+<div style={{fontSize:10,fontWeight:600,color:"var(--muted)",marginTop:4}}>🔧 Equipment: {r.eq}</div>
+<div style={{fontSize:10,fontWeight:600,marginTop:6,marginBottom:3}}>Ingredients:</div>{r.ig.map((x,j)=><div key={j} style={{fontSize:10,paddingLeft:8,lineHeight:1.4}}>• {x}</div>)}
+<div style={{fontSize:10,fontWeight:600,marginTop:6,marginBottom:3}}>Steps:</div>{r.st.map((x,j)=><div key={j} style={{fontSize:10,paddingLeft:8,marginBottom:3,lineHeight:1.5}}><b>{j+1}.</b> {x}</div>)}
+{r.tip&&<div style={{background:"#fefce8",borderRadius:5,padding:6,marginTop:4,fontSize:10,color:"#92400e"}}>💡 <b>Tip:</b> {r.tip}</div>}
+</div>}</div>)}</div>}
+
+{/* CHARTS */}
+{tab==="charts"&&<div><h2>Progress Charts</h2>
+<div className="cd"><MiniChart data={studyData} color="#10b981" label="Study Minutes — Last 7 Days"/></div>
+<div className="cd"><MiniChart data={screenData} color="#ef4444" label="Screen Time (min) — Last 7 Days"/></div>
+<div className="cd"><h3>Skill Completion</h3><svg viewBox="0 0 280 80" style={{width:"100%",maxWidth:280}}>
+{[["SQL","#3b82f6",skills.sql],["Power BI","#ec4899",skills.powerbi],["Python","#10b981",skills.python]].map(([nm,cl,arr],i)=>{const p=arr.filter(Boolean).length/arr.length*100;return<g key={i} transform={`translate(0,${i*25})`}><text x="0" y="12" fontSize="9" fill="var(--text)" fontWeight="600">{nm}</text><rect x="55" y="3" width="190" height="13" rx="3" fill="var(--light)"/><rect x="55" y="3" width={190*p/100} height="13" rx="3" fill={cl}/><text x={60+190*p/100} y="13" fontSize="8" fill="var(--text)">{Math.round(p)}%</text></g>})}</svg></div></div>}
+
+{/* POMODORO */}
+{tab==="pomo"&&<div style={{textAlign:"center",paddingTop:20}}>
+<h2>Pomodoro Timer</h2>
+<div style={{fontSize:56,fontWeight:700,color:pomo.work?"#ef4444":"#10b981",margin:"16px 0",fontVariantNumeric:"tabular-nums"}}>{Math.floor(pomo.sec/60)}:{(pomo.sec%60<10?"0":"")+(pomo.sec%60)}</div>
+<div style={{fontSize:13,color:"var(--muted)",marginBottom:16}}>{pomo.work?"🔴 Focus Time":"🟢 Break Time"}</div>
+<div style={{display:"flex",gap:6,justifyContent:"center"}}><button className="bt" style={{background:pomo.on?"#ef4444":"#10b981",padding:"8px 20px",fontSize:14}} onClick={()=>setPomo({...pomo,on:!pomo.on})}>{pomo.on?"Pause":"Start"}</button><button className="bt" style={{background:"var(--muted)",padding:"8px 20px",fontSize:14}} onClick={()=>{if(pomoRef.current)clearInterval(pomoRef.current);setPomo({on:false,work:true,sec:1500})}}>Reset</button></div>
+<div style={{display:"flex",gap:4,justifyContent:"center",marginTop:12}}>{[["25m",1500],["50m",3000],["5m",300],["10m",600]].map(([l,s])=><button key={l} className="bt" style={{background:"var(--light)",color:"var(--text)"}} onClick={()=>{if(pomoRef.current)clearInterval(pomoRef.current);setPomo({on:false,work:s>600,sec:s})}}>{l}</button>)}</div></div>}
+
+{/* BUDGET */}
+{tab==="budget"&&<div><h2>Budget</h2>
+{(()=>{const inc=budget.filter(b=>b.type==="income").reduce((s,b)=>s+Number(b.amount),0),exp=budget.filter(b=>b.type==="expense").reduce((s,b)=>s+Number(b.amount),0);return<div style={{display:"flex",gap:4,marginBottom:6}}>{[["Income","#16a34a",inc],["Expenses","#dc2626",exp],["Balance",inc-exp>=0?"#16a34a":"#dc2626",inc-exp]].map(([l,c,v])=><div key={l} className="cd" style={{flex:1,textAlign:"center"}}><div style={{fontSize:9,color:"var(--muted)"}}>{l}</div><div style={{fontSize:16,fontWeight:700,color:c}}>${v.toFixed(0)}</div></div>)}</div>})()}
+<div className="cd"><div style={{display:"flex",gap:3,flexWrap:"wrap"}}><select className="sl" value={bForm.type} onChange={e=>setBForm({...bForm,type:e.target.value})}><option value="income">Income</option><option value="expense">Expense</option></select><input className="ip" placeholder="Category" value={bForm.category} onChange={e=>setBForm({...bForm,category:e.target.value})} style={{flex:"1 1 60px"}}/><input className="ip" type="number" placeholder="$" value={bForm.amount} onChange={e=>setBForm({...bForm,amount:e.target.value})} style={{width:55}}/><button className="bt" style={{background:"#3b82f6"}} onClick={()=>{if(bForm.amount){const nb=[{...bForm,id:Date.now(),date:td()},...budget];setBudget(nb);DB.s("budget",nb);setBForm({type:"expense",category:"",amount:""})}}}>Add</button></div></div>
+{budget.slice(0,15).map((b,i)=><div key={b.id} style={{display:"flex",justifyContent:"space-between",fontSize:10,padding:"3px 0",borderBottom:"1px solid var(--light)"}}><span><span style={{color:b.type==="income"?"#16a34a":"#dc2626",fontWeight:600}}>{b.type==="income"?"+":"-"}${b.amount}</span> {b.category}</span><div style={{display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:8,color:"var(--faint)"}}>{b.date}</span><button style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer"}} onClick={()=>{const nb=budget.filter((_,j)=>j!==i);setBudget(nb);DB.s("budget",nb)}}>✕</button></div></div>)}
+<div className="sc" style={{background:"#fefce8",border:"1px solid #fde68a",marginTop:6}}><div style={{fontSize:10,fontWeight:600,color:"#92400e"}}>Upcoming cert costs:</div><div style={{fontSize:9,color:"#78350f"}}>ECBA ~$450-650 | CAPM ~$260 | PL-300 ~$165 | Data+ ~$250</div></div></div>}
+
+{/* NOTES */}
+{tab==="notes"&&<div><h2>Brain Dump</h2>
+<div className="cd"><textarea className="ip" placeholder="Ideas, tasks, random thoughts..." value={noteText} onChange={e=>setNoteText(e.target.value)} rows={3} style={{resize:"vertical",marginBottom:3}}/><button className="bt" style={{background:"#3b82f6"}} onClick={()=>{if(noteText.trim()){const nn=[{text:noteText,date:td(),id:Date.now()},...notes];setNotes(nn);DB.s("notes",nn);setNoteText("")}}}>Save Note</button></div>
+{notes.map((n,i)=><div key={n.id} className="cd" style={{padding:6}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:8,color:"var(--faint)"}}>{n.date}</span><button style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:9}} onClick={()=>{const nn=notes.filter((_,j)=>j!==i);setNotes(nn);DB.s("notes",nn)}}>✕</button></div><div style={{fontSize:10,marginTop:2,whiteSpace:"pre-wrap"}}>{n.text}</div></div>)}</div>}
+
+{/* RESOURCES */}
+{tab==="res"&&<div><h2>Resources</h2>
+{RES.map((r,i)=><div key={i} className="cd"><h3 style={{color:"#1e40af"}}>{r.c}</h3>{r.i.map((x,j)=><div key={j} style={{fontSize:10,padding:"2px 0"}}>{x}</div>)}</div>)}
+<h3 style={{marginTop:6}}>Commute Learning</h3>
+{[{d:"Mon AM",s:"BA875 flashcards"},{d:"Mon PM",s:"Career podcast"},{d:"Tue AM",s:"BA870 flashcards"},{d:"Wed AM",s:"Preview BA875 slides"},{d:"Thu AM",s:"SQL mental practice"},{d:"Fri AM",s:"Preview BA870"}].map((c,i)=><div key={i} style={{fontSize:10,padding:"3px 0",borderBottom:"1px solid var(--light)"}}><b style={{color:"#8b5cf6"}}>{c.d}:</b> {c.s}</div>)}</div>}
+
+{/* CERTS */}
+{tab==="certs"&&<div><h2>Certifications</h2>
+{[{nm:"IIBA ECBA",p:"May–Jul",cl:"#3b82f6",d:"21 PD hrs from EEP. Gold standard BA cert.",k:"ecba",req:21},
+{nm:"PMI CAPM",p:"Jul–Sep",cl:"#8b5cf6",d:"23 PM education hrs. #1 entry PM cert.",k:"capm",req:23},
+{nm:"Microsoft PL-300",p:"Oct–Nov",cl:"#ec4899",d:"Power BI. Free training on MS Learn.",k:"",req:0},
+{nm:"CompTIA Data+",p:"Dec–Jan",cl:"#f59e0b",d:"Vendor-neutral. CompTIA certified.",k:"",req:0}
+].map((c,i)=><div key={i} className="cd" style={{borderLeft:"4px solid "+c.cl}}>
+<div style={{display:"flex",justifyContent:"space-between"}}><h3>{i+1}. {c.nm}</h3><span style={{fontSize:9,color:c.cl,fontWeight:600}}>{c.p}</span></div>
+<div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>{c.d}</div>
+{c.req>0&&<div style={{marginTop:4}}>
+<div style={{display:"flex",justifyContent:"space-between",fontSize:10}}><span>Study hours</span><span style={{fontWeight:700,color:c.cl}}>{certHrs[c.k]||0}/{c.req}h</span></div>
+<div style={{height:6,background:"var(--light)",borderRadius:3,marginTop:3,overflow:"hidden"}}><div style={{height:"100%",background:c.cl,width:Math.min(100,((certHrs[c.k]||0)/c.req)*100)+"%"}}/></div>
+<div style={{display:"flex",gap:3,marginTop:4}}>{[1,2,3].map(h=><button key={h} className="bt" style={{background:c.cl}} onClick={()=>{const nc={...certHrs,[c.k]:(certHrs[c.k]||0)+h};setCertHrs(nc);DB.s("certhrs",nc)}}>+{h}h</button>)}</div></div>}
+</div>)}</div>}
+
+{/* JOURNAL LOG */}
+{tab==="log"&&<div><h2>Journal History</h2>
+{Object.keys(journals).sort().reverse().map(jdk=>{const j=journals[jdk];return<div key={jdk} className="cd"><b style={{fontSize:10}}>{fmt(new Date(jdk+"T12:00:00"))}</b>
+{j.accomplished&&<div style={{fontSize:10,marginTop:2}}>✅ {j.accomplished}</div>}
+{j.roadblocks&&<div style={{fontSize:10}}>🚧 {j.roadblocks}</div>}
+{j.tomorrow&&<div style={{fontSize:10}}>🎯 {j.tomorrow}</div>}</div>})}</div>}
+
+{/* SETTINGS */}
+{tab==="set"&&<div><h2>Settings</h2>
+<div className="cd"><h3>🌙 Dark Mode</h3><button className="bt" style={{background:dark?"#f59e0b":"#1e293b",padding:"6px 14px"}} onClick={()=>{const nd=!dark;setDark(nd);DB.s("dark",nd)}}>{dark?"☀️ Switch to Light":"🌙 Switch to Dark"}</button></div>
+<div className="cd"><h3>"Why" Statement</h3><div style={{fontSize:9,color:"var(--muted)",marginBottom:3}}>Shows at the top every time you open the app</div><textarea className="ip" value={whyText} onChange={e=>{setWhyText(e.target.value);DB.s("why",e.target.value)}} rows={2}/></div>
+<div className="cd"><h3>Backup & Restore</h3><div style={{fontSize:9,color:"var(--muted)",marginBottom:4}}>Export weekly (Sunday planning). Import on other devices.</div><div style={{display:"flex",gap:4}}><button className="bt" style={{background:"#10b981",padding:"6px 14px"}} onClick={exportAll}>📥 Export All Data</button><label className="bt" style={{background:"#3b82f6",padding:"6px 14px",cursor:"pointer"}}>📤 Import Backup<input type="file" accept=".json" onChange={importAll} style={{display:"none"}}/></label></div></div>
+<div className="cd"><h3>Data Summary</h3><div style={{fontSize:10,color:"var(--muted)",lineHeight:1.8}}>Journals: {Object.keys(journals).length} · Apps: {apps.length} · Network: {nets.length} · Budget: {budget.length} · Notes: {notes.length} · Study logs: {studyLog.length} · Grades: {(grades.ba875?.hw?.length||0)+(grades.ba870?.tests?.length||0)}</div></div>
+<div className="sc" style={{background:"#fef2f2",border:"1px solid #fecaca"}}><div style={{fontSize:10,fontWeight:600,color:"#991b1b",marginBottom:4}}>⚠ Danger Zone</div><button className="bt" style={{background:"#dc2626"}} onClick={()=>{if(confirm("Delete ALL data? This cannot be undone. Export first!")){Object.keys(localStorage).filter(k=>k.startsWith("v9-")).forEach(k=>localStorage.removeItem(k));location.reload()}}}>Delete Everything</button></div></div>}
+</div>}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+
+// Register service worker for PWA
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
